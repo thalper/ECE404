@@ -1,0 +1,293 @@
+#Homework Number: hw05
+#Name: Tycho Halpern
+#ECN login: thalper
+#Due Date: February 22, 2022
+#!/usr/bin/env python3
+
+from operator import inv
+import os
+import sys
+from wsgiref import headers
+
+from BitVector import *
+
+mod = BitVector(bitstring='100011011')
+subTable = []
+invSubTable = []
+
+def genTables():
+    c = BitVector(bitstring='01100011')
+    d = BitVector(bitstring='00000101')
+    for i in range(0, 256):
+        # For the encryption SBox
+        a = BitVector(intVal = i, size=8).gf_MI(mod, 8) if i != 0 else BitVector(intVal=0)
+        # For bit scrambling for the encryption SBox entries:
+        a1,a2,a3,a4 = [a.deep_copy() for x in range(4)]
+        a ^= (a1 >> 4) ^ (a2 >> 5) ^ (a3 >> 6) ^ (a4 >> 7) ^ c
+        subTable.append(int(a))
+        # For the decryption Sbox:
+        b = BitVector(intVal = i, size=8)
+        # For bit scrambling for the decryption SBox entries:
+        b1,b2,b3 = [b.deep_copy() for x in range(3)]
+        b = (b1 >> 2) ^ (b2 >> 5) ^ (b3 >> 7) ^ d
+        check = b.gf_MI(mod, 8)
+        b = check if isinstance(check, BitVector) else 0
+        invSubTable.append(int(b))
+
+def gen_key_schedule_256(key_bv):
+    #  We need 60 keywords (each keyword consists of 32 bits) in the key schedule for
+    #  256 bit AES. The 256-bit AES uses the first four keywords to xor the input
+    #  block with.  Subsequently, each of the 14 rounds uses 4 keywords from the key
+    #  schedule. We will store all 60 keywords in the following list:
+    key_words = [None for i in range(60)]
+    round_constant = BitVector(intVal = 0x01, size=8)
+    for i in range(8):
+        key_words[i] = key_bv[i*32 : i*32 + 32]
+    for i in range(8,60):
+        if i%8 == 0:
+            kwd, round_constant = gee(key_words[i-1], round_constant, subTable)
+            key_words[i] = key_words[i-8] ^ kwd
+        elif (i - (i//8)*8) < 4:
+            key_words[i] = key_words[i-8] ^ key_words[i-1]
+        elif (i - (i//8)*8) == 4:
+            key_words[i] = BitVector(size = 0)
+            for j in range(4):
+                key_words[i] += BitVector(intVal = 
+                                 subTable[key_words[i-1][8*j:8*j+8].intValue()], size = 8)
+            key_words[i] ^= key_words[i-8] 
+        elif ((i - (i//8)*8) > 4) and ((i - (i//8)*8) < 8):
+            key_words[i] = key_words[i-8] ^ key_words[i-1]
+        else:
+            sys.exit("error in key scheduling algo for i = %d" % i)
+    return key_words
+
+def gee(keyword, round_constant, subTable):
+    '''
+    This is the g() function you see in Figure 4 of Lecture 8.
+    '''
+    rotated_word = keyword.deep_copy()
+    rotated_word << 8
+    newword = BitVector(size = 0)
+    for i in range(4):
+        newword += BitVector(intVal = subTable[rotated_word[8*i:8*i+8].intValue()], size = 8)
+    newword[:8] ^= round_constant
+    round_constant = round_constant.gf_multiply_modular(BitVector(intVal = 0x02), mod, 8)
+    return newword, round_constant
+
+def xor(statearray, keys, i):
+    out = statearray
+    subKey = [0] * 16
+
+    [j, k] = keys[i].divide_into_two()
+    [subKey[0], subKey[1]] = j.divide_into_two()
+    [subKey[2], subKey[3]] = k.divide_into_two()
+
+    [j, k] = keys[i + 1].divide_into_two()
+    [subKey[4], subKey[5]] = j.divide_into_two()
+    [subKey[6], subKey[7]] = k.divide_into_two()
+
+    [j, k] = keys[i + 2].divide_into_two()
+    [subKey[8], subKey[9]] = j.divide_into_two()
+    [subKey[10], subKey[11]] = k.divide_into_two()
+
+    [j, k] = keys[i + 3].divide_into_two()
+    [subKey[12], subKey[13]] = j.divide_into_two()
+    [subKey[14], subKey[15]] = k.divide_into_two()
+
+    for x in range(16):
+        out[x % 4][x // 4] = out[x % 4][x // 4]^subKey[x]
+
+    return out
+
+def MixCol(statearray):
+    out = [[BitVector(intVal=0, size=8) for x in range(4)] for x in range(4)]
+
+    constantTwo = BitVector(intVal=2, size=8)
+    constantThree = BitVector(intVal=3, size=8)
+
+    for x in range(4):
+        col1 = constantTwo.gf_multiply_modular(statearray[0][x], mod, 8)
+        col2 = constantThree.gf_multiply_modular(statearray[1][x], mod, 8)
+        col3 = col1^col2
+        col3 = col3^statearray[2][x]
+        col3 = col3^statearray[3][x]
+        out[0][x] = col3
+    for x in range(4):
+        col1 = constantTwo.gf_multiply_modular(statearray[1][x], mod, 8)
+        col2 = constantThree.gf_multiply_modular(statearray[2][x], mod, 8)
+        col3 = col1^col2
+        col3 = col3^statearray[0][x]
+        col3 = col3^statearray[3][x]
+        out[1][x] = col3
+    for x in range(4):
+        col1 = constantTwo.gf_multiply_modular(statearray[2][x], mod, 8)
+        col2 = constantThree.gf_multiply_modular(statearray[3][x], mod, 8)
+        col3 = col1^col2
+        col3 = col3^statearray[0][x]
+        col3 = col3^statearray[1][x]
+        out[2][x] = col3
+    for x in range(4):
+        col1 = constantTwo.gf_multiply_modular(statearray[3][x], mod, 8)
+        col2 = constantThree.gf_multiply_modular(statearray[0][x], mod, 8)
+        col3 = col1^col2
+        col3 = col3^statearray[1][x]
+        col3 = col3^statearray[2][x]
+        out[3][x] = col3
+    return out
+
+
+def shiftRows(statearray):
+    temp = [0] * 16
+    out = [[0 for i in range(4)] for i in range(4)]
+
+    for i in range(16):
+        temp[i] = statearray[i % 4][i // 4]
+
+    out[0][0] = temp[0]
+    out[0][1] = temp[4]
+    out[0][2] = temp[8]
+    out[0][3] = temp[12]
+    out[1][0] = temp[5]
+    out[1][1] = temp[9]
+    out[1][2] = temp[13]
+    out[1][3] = temp[1]
+    out[2][0] = temp[10]
+    out[2][1] = temp[14]
+    out[2][2] = temp[2]
+    out[2][3] = temp[6]
+    out[3][0] = temp[15]
+    out[3][1] = temp[3]
+    out[3][2] = temp[7]
+    out[3][3] = temp[11]
+
+    return out
+
+def substitute(statearray, subTable):
+    out = statearray
+    for x in range(4):
+        for y in range(4):
+            [row, col] = out[y][x].divide_into_two()
+            row.pad_from_left(4)
+            col.pad_from_left(4)
+            row = row.int_val()
+            col = col.int_val()
+            out[y][x] = BitVector(intVal=subTable[row*16 + col], size=8)
+    return out
+
+
+def encrypt(bv, key_bv):
+    statearray = [[0 for x in range(4)] for x in range(4)]
+    for x in range(16):
+        statearray[x%4][x//4] = bv[x*8:(x+1)*8]
+
+    statearray = xor(statearray, key_bv, 0)
+    for round in range(1, 14):
+        statearray = substitute(statearray, subTable)
+        statearray = shiftRows(statearray)
+        statearray = MixCol(statearray)
+        statearray = xor(statearray, key_bv, (round*4))
+    statearray = substitute(statearray, subTable)
+    statearray = shiftRows(statearray)
+    statearray = xor(statearray, key_bv, (14 * 4))
+
+    out = BitVector(intVal=0, size=128)
+    for x in range(16):
+        out[x*8:(x+1)*8] = statearray[x%4][x//4]
+
+    return out
+
+
+# def ctr_aes_image(iv, inFile, outFile, keyFileStr):
+#     genTables()
+
+#     keyFile = open(keyFileStr)
+#     key_bv = BitVector(textstring=keyFile.read(32))
+#     keyFile.close()
+
+#     key_words = gen_key_schedule_256(key_bv)
+#     bv = BitVector(filename=inFile)
+#     encryptedFile = open(outFile, 'wb')
+
+
+#     newLine = 0
+#     newLine_bv = BitVector(intVal=10, size=8)
+#     while newLine != 3:
+#         bitVector = bv.read_bits_from_file(8)
+#         if bitVector == newLine_bv:
+#             newLine += 1
+#         bitVector.write_to_file(encryptedFile)
+
+#     # #copy header to output file
+#     # charCount = 0
+#     # for i in range(3):
+#     #     charCount += 1
+#     #     line = ImageHeader.readline()
+#     #     encryptedFile.write(line)
+#     #     charCount += len(line)
+
+#     # #encrypt image and add to output file
+#     # bv = BitVector(filename=inFile)
+#     # i = 0
+#     # while i < charCount:
+#     #     i += 1
+#     #     trash = bv.read_bits_from_file(8)
+
+#     count = 0
+#     while (bv.more_to_read):
+#         print(count)
+#         count += 1
+#         curr = bv.read_bits_from_file(128)
+
+#         if curr._getsize() < 128:
+#             curr.pad_from_left(128 - curr._getsize())
+
+#         enc = encrypt(iv, key_words)
+#         temp = int(iv)
+#         temp += 1
+#         iv = BitVector(intVal=temp, size=128)
+
+#         out = enc.__xor__(curr)
+#         out.write_to_file(encryptedFile)
+#     encryptedFile.close()
+#     return
+
+def ctr_aes_image(iv, image_file, out_file, keyFileStr):
+    genTables()
+    keyFile = open(keyFileStr)
+    key_bv = BitVector(textstring=keyFile.read(32))
+    keyFile.close()
+    key_words = gen_key_schedule_256(key_bv)
+    bv = BitVector(filename=image_file)
+    encryptedFile = open(out_file, 'wb')
+
+    newLine = 0
+    newLine_bv = BitVector(intVal=10, size=8)
+    while newLine != 3:
+        bitVector = bv.read_bits_from_file(8)
+        if bitVector == newLine_bv:
+            newLine += 1
+        bitVector.write_to_file(encryptedFile)
+
+    while (bv.more_to_read):
+        bitvec = bv.read_bits_from_file(128)
+        if bitvec._getsize() < 128:
+            bitvec.pad_from_right(128 - bitvec._getsize())
+        enc = encrypt(iv, key_words)
+        
+        temp = int(iv)
+        temp += 1
+        iv = BitVector(intVal=temp, size=128)
+
+        #XORing the plaintext with the output from the block cipher before writing it to the file
+        out = enc.__xor__(bitvec)
+        out.write_to_file(encryptedFile)
+
+    encryptedFile.close()
+    return
+
+
+if __name__ == '__main__':
+    iv = BitVector(textstring="computersecurity") #iv will be 128 bits
+    ctr_aes_image(iv,"image.ppm","my_enc_image.ppm","keyCTR.txt")  
+    bashCommand = "diff " + "my_enc_image.ppm" + " " + "enc_image.ppm"
+    os.system(bashCommand)
