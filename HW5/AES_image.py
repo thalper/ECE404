@@ -224,7 +224,6 @@ def ctr_aes_image(iv, image_file, out_file, keyFileStr):
         temp += 1
         iv = BitVector(intVal=temp, size=128)
 
-        #XORing the plaintext with the output from the block cipher before writing it to the file
         out = enc.__xor__(bitvec)
         out.write_to_file(encryptedFile)
 
