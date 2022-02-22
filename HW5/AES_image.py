@@ -197,60 +197,6 @@ def encrypt(bv, key_bv):
     return out
 
 
-# def ctr_aes_image(iv, inFile, outFile, keyFileStr):
-#     genTables()
-
-#     keyFile = open(keyFileStr)
-#     key_bv = BitVector(textstring=keyFile.read(32))
-#     keyFile.close()
-
-#     key_words = gen_key_schedule_256(key_bv)
-#     bv = BitVector(filename=inFile)
-#     encryptedFile = open(outFile, 'wb')
-
-
-#     newLine = 0
-#     newLine_bv = BitVector(intVal=10, size=8)
-#     while newLine != 3:
-#         bitVector = bv.read_bits_from_file(8)
-#         if bitVector == newLine_bv:
-#             newLine += 1
-#         bitVector.write_to_file(encryptedFile)
-
-#     # #copy header to output file
-#     # charCount = 0
-#     # for i in range(3):
-#     #     charCount += 1
-#     #     line = ImageHeader.readline()
-#     #     encryptedFile.write(line)
-#     #     charCount += len(line)
-
-#     # #encrypt image and add to output file
-#     # bv = BitVector(filename=inFile)
-#     # i = 0
-#     # while i < charCount:
-#     #     i += 1
-#     #     trash = bv.read_bits_from_file(8)
-
-#     count = 0
-#     while (bv.more_to_read):
-#         print(count)
-#         count += 1
-#         curr = bv.read_bits_from_file(128)
-
-#         if curr._getsize() < 128:
-#             curr.pad_from_left(128 - curr._getsize())
-
-#         enc = encrypt(iv, key_words)
-#         temp = int(iv)
-#         temp += 1
-#         iv = BitVector(intVal=temp, size=128)
-
-#         out = enc.__xor__(curr)
-#         out.write_to_file(encryptedFile)
-#     encryptedFile.close()
-#     return
-
 def ctr_aes_image(iv, image_file, out_file, keyFileStr):
     genTables()
     keyFile = open(keyFileStr)
