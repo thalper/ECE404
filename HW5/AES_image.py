@@ -236,3 +236,4 @@ if __name__ == '__main__':
     ctr_aes_image(iv,"image.ppm","my_enc_image.ppm","keyCTR.txt")  
     bashCommand = "diff " + "my_enc_image.ppm" + " " + "enc_image.ppm"
     os.system(bashCommand)
+
