@@ -1,0 +1,22 @@
+#!/usr/bin/perl -w
+
+use strict;
+use Fcntl qw( :DEFAULT :flock );
+
+sysopen(FH, "MESSAGE_index_file", O_RDWR | O_CREAT )
+    or die "can't open filename: $!";
+
+my $ofh = select( FH ); $| = 1; select( $ofh );
+flock( FH, LOCK_EX )
+    or die "can't write-lock filename: $!";
+my $index = <FH> || 0;
+seek( FH, 0, 0 )
+    or die "can't rewind filename: $!";
+print FH ++$index, "\n"
+    or die "can't write filename: $!";
+truncate(FH, tell(FH) )
+    or die "can't truncate filename: $!";
+print STDOUT $index;
+close( FH )
+    or die "can't close filename: $!";
+
