@@ -1,3 +1,7 @@
+//Homework Number: 10
+//Name: Tycho Halpern
+//ECN Login: thalper
+//Due Date: April 7, 2022
 /*
 / file : server.c
 /------------------------------------------
@@ -118,7 +122,8 @@ char * clientComm(int clntSockfd,int * senderBuffSize_addr, int * optlen_addr){
         exit(1);
     }    
 
-    strcpy(str, recvBuff);
+    strncpy(str, recvBuff, *senderBuffSize_addr); // the original function (strcpy) does not check the size of the buffer before copying the string. 
+    // strncpy checks the size of the sent buffer before copying the string to the receiving buffer.
 	
     /* send data to the client */
     if (send(clntSockfd, str, strlen(str), 0) == -1) {
