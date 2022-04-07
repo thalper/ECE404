@@ -15,7 +15,7 @@
 //#include <arpa/inet.h>
 //#include <unistd.h>
 
-#define PORT 9000
+#define PORT 7777
 #define MAX_DATA_SIZE 4096
 
 int isHexChar(char c);
@@ -60,7 +60,8 @@ int main(int argc, char *argv[])
 	char two[2];
 
 	/* repeat until "exit" input */
-	while(1){		printf("Say something: ");
+	while(1){
+		printf("Say something: ");
 		fgets(sendDataBefore, MAX_DATA_SIZE, stdin);
 		int i;
 		int j = 0;
