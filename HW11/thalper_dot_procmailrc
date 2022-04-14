@@ -1,0 +1,58 @@
+SHELL=/bin/sh
+PATH=/usr/local/lib/mh:$PATH
+MAILDIR=$HOME/Mail
+LOGFILE=$HOME/Mail/logfile
+SENDMAIL=/usr/sbin/sendmail
+#VERBOSE=1
+VERBOSE=0
+EOL="
+"
+LOG="$EOL$EOL$EOL"
+LOG="New message log:$EOL"
+LOG=`perl GET_MESSAGE_INDEX`
+LOG="$EOL"
+
+
+
+## Recipe_1:
+## multiple entries in the "from" header
+:0 :
+* ^From.*,
+recipe_1
+
+
+
+## Recipe_2:
+## check if any of these words are in the subject line
+:0 :
+* ^Subject.*(diploma|diploma.|Diploma|Degree|degree|buy|buhy|Buy|Inteveo|medication)
+recipe_2
+
+
+
+## Recipe_3:
+## check content of body
+:0 B:
+* (Alert!|casino)
+recipe_3
+
+
+## Recipe_4:
+## check content of body
+:0 HB:
+* ^content-type: multipart/alternative
+* ^content-Type: text/plain
+* !^content-type: application/pdf
+* !^content-type: application/zip
+* !^content-type: application/msword
+* !^content-type: application/.*signature
+* ^content-Transfer-Encoding: (quoted-printable|8bit)
+recipe_4
+
+
+## Recipe_none:
+## no recipe catches mail, all remaining mail goes here
+:0 :
+recipe_none
+
+
